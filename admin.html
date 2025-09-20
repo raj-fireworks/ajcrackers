@@ -70,6 +70,14 @@
       width: 60px;
     }
 
+    #searchBox {
+      margin-top: 10px;
+      padding: 8px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
     @media (max-width: 768px) {
       .form-row {
         flex-direction: column;
@@ -102,6 +110,11 @@
         </div>
       </div>
 
+      <!-- Search box -->
+      <div style="margin-top:8px;">
+        <input id="searchBox" type="text" placeholder="Search products by name..." oninput="onSearchChange(this.value)">
+      </div>
+
       <table id="productTable">
         <thead>
           <tr>
@@ -115,9 +128,10 @@
         </thead>
         <tbody></tbody>
       </table>
-<div id="grandTotalContainer" style="margin-top: 20px; font-size: 18px; font-weight: bold; text-align: right;">
-  Grand Total: Rs.0.00
-</div>
+
+      <div id="grandTotalContainer" style="margin-top: 20px; font-size: 18px; font-weight: bold; text-align: right;">
+        Grand Total: Rs.0.00
+      </div>
 
       <button class="button" onclick="printBill()">🧾 Print Bill</button>
       <button class="button" style="background-color:#5cb85c; margin-left: 10px;" onclick="printChecklist()">📋 Print Checklist</button>
@@ -157,7 +171,7 @@
 
           const categories = {};
           products.forEach(p => {
-           const key = toTitleCase(p.category.trim() || 'Uncategorized');
+           const key = toTitleCase((p.category || 'Uncategorized').trim());
             categories[key] = categories[key] || [];
             categories[key].push(p);
           });
@@ -166,8 +180,11 @@
 
           Object.entries(categories).forEach(([category, items]) => {
             const catId = `cat-${categoryIndex}`;
+
+            // Category header row (store data-cat for filtering)
             const catRow = document.createElement('tr');
             catRow.className = 'category-header';
+            catRow.dataset.cat = catId;
             catRow.innerHTML = `<td colspan="6" style="cursor:pointer;text-align:left;">▼ ${category}</td>`;
             tbody.appendChild(catRow);
 
@@ -187,19 +204,25 @@
 
             catRow.addEventListener('click', () => {
               const rows = document.querySelectorAll(`.${catId}`);
-              const isVisible = rows[0]?.style.display !== 'none';
-              rows.forEach(r => r.style.display = isVisible ? 'none' : '');
-              catRow.cells[0].innerText = `${isVisible ? '▶' : '▼'} ${category}`;
+              // find first visible row to decide current visibility
+              const anyVisible = Array.from(rows).some(r => r.style.display !== 'none');
+              rows.forEach(r => r.style.display = anyVisible ? 'none' : '');
+              catRow.cells[0].innerText = `${anyVisible ? '▶' : '▼'} ${category}`;
+              updateTotals();
             });
 
             categoryIndex++;
           });
+
+          // ensure totals update when the table is rendered
+          updateTotals();
         }
-function toTitleCase(str) {
-  return str.replace(/\w\S*/g, function (txt) {
-    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-  });
-}
+
+        function toTitleCase(str) {
+          return str.replace(/\w\S*/g, function (txt) {
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+          });
+        }
 
         function validateIntegerInput(input) {
           if (input.value && !/^\d+$/.test(input.value)) {
@@ -209,26 +232,71 @@ function toTitleCase(str) {
           }
         }
 
-       function updateTotals() {
-  let grandTotal = 0;
+        function updateTotals() {
+          let grandTotal = 0;
 
-  document.querySelectorAll('#productTable tbody tr').forEach(row => {
-    const input = row.querySelector('input[type="number"]');
-    const totalCell = row.querySelector('.item-total');
-    if (!input) return;
+          document.querySelectorAll('#productTable tbody tr').forEach(row => {
+            // skip category header rows
+            if (row.classList.contains('category-header')) return;
 
-    const qty = parseInt(input.value) || 0;
-    const price = parseFloat(input.dataset.price) || 0;
-    const total = qty * price;
-    grandTotal += total;
+            // skip hidden rows (filtered or collapsed)
+            if (row.style.display === 'none') return;
 
-    totalCell.textContent = `Rs.${total.toFixed(2)}`;
-  });
+            const input = row.querySelector('input[type="number"]');
+            const totalCell = row.querySelector('.item-total');
+            if (!input || !totalCell) return;
 
-  // ✅ Update the grand total at the bottom
-  document.getElementById('grandTotalContainer').textContent = `Grand Total: Rs.${grandTotal.toFixed(2)}`;
-}
+            const qty = parseInt(input.value) || 0;
+            const price = parseFloat(input.dataset.price) || 0;
+            const total = qty * price;
+            grandTotal += total;
 
+            totalCell.textContent = `Rs.${total.toFixed(2)}`;
+          });
+
+          // Update the grand total at the bottom
+          document.getElementById('grandTotalContainer').textContent = `Grand Total: Rs.${grandTotal.toFixed(2)}`;
+        }
+
+        // Search/filter implementation
+        function onSearchChange(query) {
+          filterProducts(query);
+          updateTotals();
+        }
+
+        function filterProducts(query) {
+          const q = (query || '').trim().toLowerCase();
+          const tbody = document.querySelector('#productTable tbody');
+          if (!tbody) return;
+
+          // Get all category header rows
+          const catHeaders = Array.from(tbody.querySelectorAll('tr.category-header'));
+
+          // For each category header handle its group
+          catHeaders.forEach(catHeader => {
+            const catId = catHeader.dataset.cat;
+            const itemRows = Array.from(tbody.querySelectorAll(`tr.${catId}`));
+
+            let anyMatch = false;
+            itemRows.forEach(r => {
+              const nameCell = r.cells[0];
+              const productName = (nameCell?.textContent || '').toLowerCase();
+              const match = q === '' || productName.includes(q);
+              r.style.display = match ? '' : 'none';
+              if (match) anyMatch = true;
+            });
+
+            // Show category header only if any of its items match
+            catHeader.style.display = anyMatch ? '' : 'none';
+            // If header visible and previously collapsed, ensure items remain hidden accordingly:
+            if (catHeader.style.display !== 'none') {
+              // preserve the header's indicator arrow but keep expanded; if it had been collapsed via click we used rows' style to hide them
+              // ensure header shows expanded sign if its items are visible
+              const visibleItems = itemRows.some(r => r.style.display !== 'none');
+              catHeader.cells[0].innerText = `${visibleItems ? '▼' : '▶'} ${catHeader.cells[0].innerText.replace(/^[▼▶]\s*/, '')}`;
+            }
+          });
+        }
 
         function downloadCustomerInfo() {
           const today = new Date().toISOString().slice(0, 10);
@@ -260,55 +328,58 @@ function toTitleCase(str) {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }
-function printChecklist() {
-  const name = document.getElementById('customerName').value.trim();
-  const address = document.getElementById('customerAddress').value.trim();
-  if (!name || !address) {
-    alert('Name and Address are required.');
-    return;
-  }
-  const phone = document.getElementById('customerPhone').value.trim();
 
-  const rows = [];
-  let count = 0;
+        function printChecklist() {
+          const name = document.getElementById('customerName').value.trim();
+          const address = document.getElementById('customerAddress').value.trim();
+          if (!name || !address) {
+            alert('Name and Address are required.');
+            return;
+          }
+          const phone = document.getElementById('customerPhone').value.trim();
 
-  document.querySelectorAll('#productTable tbody tr').forEach(row => {
-    const input = row.querySelector('input[type="number"]');
-    if (!input) return;
-    const qty = parseInt(input.value) || 0;
-    if (qty <= 0) return;
-    const pname = input.dataset.name;
-    count++;
-    rows.push([count, pname, qty]);
-  });
+          const rows = [];
+          let count = 0;
 
-  if (!rows.length) {
-    alert('Please enter at least one product quantity.');
-    return;
-  }
+          document.querySelectorAll('#productTable tbody tr').forEach(row => {
+            if (row.classList.contains('category-header')) return;
+            if (row.style.display === 'none') return; // skip hidden rows
+            const input = row.querySelector('input[type="number"]');
+            if (!input) return;
+            const qty = parseInt(input.value) || 0;
+            if (qty <= 0) return;
+            const pname = input.dataset.name;
+            count++;
+            rows.push([count, pname, qty]);
+          });
 
-  const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text('Packing Checklist', 14, 20);
-  doc.setFontSize(12);
-  doc.text(`Name: ${name}`, 14, 30);
-  doc.text(`Address: ${address}`, 14, 38);
-  if (phone) doc.text(`Phone: ${phone}`, 14, 46);
+          if (!rows.length) {
+            alert('Please enter at least one product quantity.');
+            return;
+          }
 
-  doc.autoTable({
-    startY: 55,
-    head: [['S.No', 'Product', 'Qty']],
-    body: rows,
-    theme: 'grid',
-    headStyles: { fillColor: [92, 184, 92] }, // green header
-  });
+          const doc = new jsPDF();
+          doc.setFontSize(16);
+          doc.text('Packing Checklist', 14, 20);
+          doc.setFontSize(12);
+          doc.text(`Name: ${name}`, 14, 30);
+          doc.text(`Address: ${address}`, 14, 38);
+          if (phone) doc.text(`Phone: ${phone}`, 14, 46);
 
-  const finalY = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(10);
-  doc.text('Use this checklist for packing the order.', 14, finalY);
+          doc.autoTable({
+            startY: 55,
+            head: [['S.No', 'Product', 'Qty']],
+            body: rows,
+            theme: 'grid',
+            headStyles: { fillColor: [92, 184, 92] }, // green header
+          });
 
-  doc.save(`Checklist_${name.replace(/\s+/g, '_')}.pdf`);
-}
+          const finalY = doc.lastAutoTable.finalY + 10;
+          doc.setFontSize(10);
+          doc.text('Use this checklist for packing the order.', 14, finalY);
+
+          doc.save(`Checklist_${name.replace(/\s+/g, '_')}.pdf`);
+        }
 
         function printBill() {
           const name = document.getElementById('customerName').value.trim();
@@ -322,6 +393,8 @@ function printChecklist() {
           const rows = [];
           let count = 0, grandTotal = 0;
           document.querySelectorAll('#productTable tbody tr').forEach(row => {
+            if (row.classList.contains('category-header')) return;
+            if (row.style.display === 'none') return; // skip hidden rows
             const input = row.querySelector('input[type="number"]');
             if (!input) return;
             const qty = parseInt(input.value) || 0;
