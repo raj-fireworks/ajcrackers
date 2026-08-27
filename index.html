@@ -339,6 +339,12 @@ td:first-child {
     padding-left: 15px;
     font-size: 18px;
   }
+  .category-tamil {
+    font-size: 14px;
+    font-weight: normal;
+    color: #555;
+    display: block;
+  }
   .category-row {
     transition: all 0.3s ease;
   }
@@ -505,12 +511,13 @@ tr {
     padding: 6px;
   }
 
-  table thead th:nth-child(1) { width: 120px; } /* Crackers Name */
-  table thead th:nth-child(2) { width: 40px; }  /* Unit */
-  table thead th:nth-child(3),
-  table thead th:nth-child(4) { width: 60px; }  /* Actual & Offer Price */
-  table thead th:nth-child(5) { width: 40px; }  /* Quantity */
-  table thead th:nth-child(6) { width: 60px; }  /* Total */
+  table thead th:nth-child(1) { width: 110px; } /* Crackers Name */
+  table thead th:nth-child(2) { width: 100px; } /* Tamil Name */
+  table thead th:nth-child(3) { width: 40px; }  /* Unit */
+  table thead th:nth-child(4),
+  table thead th:nth-child(5) { width: 60px; }  /* Actual & Offer Price */
+  table thead th:nth-child(6) { width: 40px; }  /* Quantity */
+  table thead th:nth-child(7) { width: 60px; }  /* Total */
 
   table {
     table-layout: auto !important;
@@ -598,9 +605,10 @@ tr {
 <table id="productTable">
 <thead>
   <tr>
-    <th style="width:200px;">Crackers Name</th>
+    <th style="width:180px;">Crackers Name</th>
+    <th style="width:160px;">பட்டாசு வகைகள்</th>
     <th style="width:50px;">Unit</th>
-    <th style="width:70px;">Actual Price (₹)</th> <!-- NEW -->
+    <th style="width:70px;">Actual Price (₹)</th>
     <th style="width:70px;">Offer Price (₹)</th>
     <th style="width:50px;">Quantity</th>
     <th style="width:70px;">Total (₹)</th>
@@ -636,6 +644,29 @@ tr {
 <script>
   let currentOffer = 80;
 
+  // Tamil translations for category headings
+  const categoryTamilMap = {
+    "One Sound Crackers": "ஒற்றை சவுண்டு பட்டாசுகள்",
+    "Thunder Crackers": "இடி வெடிகள்",
+    "Deluxe Crackers": "டீலக்ஸ் பட்டாசுகள்",
+    "Bijli Crackers": "பிஜிலி பட்டாசுகள்",
+    "Wala": "வாலா",
+    "Bombs": "பாம்புகள்",
+    "Ropes & Candles": "ரோப்ஸ் & கேண்டில்ஸ்",
+    "Chakkar": "சக்கர்",
+    "Flower Pots": "ஃப்ளவர் பாட்ஸ்",
+    "Rocket": "ராக்கெட்",
+    "Whistling": "விசில் வகைகள்",
+    "Stone": "ஸ்டோன் வகைகள்",
+    "Sky Display": "ஆகாய பட்டாசுகள்",
+    "Repeating Shots": "ரிபீட்டிங் ஷாட்ஸ்",
+    "Fountain Items": "ஃபவுண்டன் பொருட்கள்",
+    "Special Items": "ஸ்பெஷல் பொருட்கள்",
+    "Kids Special": "குழந்தைகள் ஸ்பெஷல்",
+    "Gift Box (Fixed Price.No Discount)": "கிஃப்ட் பாக்ஸ் (நிலையான விலை - தள்ளுபடி இல்லை)",
+    "Sparklers": "மத்தாப்பு வகைகள்"
+  };
+
   function showDaysLeft() {
     const offerEndDate = new Date("2025-10-25");
     const today = new Date();
@@ -661,6 +692,7 @@ function loadProducts() {
         // Convert and map products
         const products = Object.entries(data).map(([name, info]) => ({
           name,
+          tamil: info.tamil || "",
           price: Number(info.price) || 0,
           offerprice: Number(info.offerprice) || 0,
           unit: info.unit || "-",
@@ -671,12 +703,12 @@ function loadProducts() {
 
       } catch (err) {
         console.error("❌ Error processing products:", err);
-        document.querySelector("#productTable tbody").innerHTML = `<tr><td colspan="6">Failed to process products.</td></tr>`;
+        document.querySelector("#productTable tbody").innerHTML = `<tr><td colspan="7">Failed to process products.</td></tr>`;
       }
     })
     .catch(err => {
       console.error("Error loading products.json:", err);
-      document.querySelector("#productTable tbody").innerHTML = `<tr><td colspan="6">Failed to load products.</td></tr>`;
+      document.querySelector("#productTable tbody").innerHTML = `<tr><td colspan="7">Failed to load products.</td></tr>`;
     });
 }
 
@@ -685,7 +717,7 @@ function renderProductTable(products) {
   tbody.innerHTML = "";
 
   if (!products.length) {
-    tbody.innerHTML = `<tr><td colspan="6">No products available.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">No products available.</td></tr>`;
     return;
   }
 
@@ -702,8 +734,9 @@ function renderProductTable(products) {
     const catRow = document.createElement("tr");
     catRow.classList.add("category-header");
     catRow.style.cursor = "pointer";
-    catRow.innerHTML = `<td colspan="6" style="text-align:left; background:#f0f0f0; font-weight:bold;">
-      ▼ ${category}
+    const catTamil = categoryTamilMap[category] || "";
+    catRow.innerHTML = `<td colspan="7" style="text-align:left; background:#f0f0f0; font-weight:bold;">
+      <span class="cat-arrow">▼</span> ${category}${catTamil ? ` <span class="category-tamil">${catTamil}</span>` : ""}
     </td>`;
     tbody.appendChild(catRow);
 
@@ -732,6 +765,7 @@ const imagePath = `images/${encodeURIComponent(imageName)}`;
             <span class="product-name">${item.name}</span>
           </div>
         </td>
+        <td class="product-name-tamil">${item.tamil || "-"}</td>
         <td>${item.unit || "-"}</td>
         <td>₹${item.price.toFixed(2)}</td>
         <td>₹${item.offerprice.toFixed(2)}</td>
@@ -758,9 +792,8 @@ const imagePath = `images/${encodeURIComponent(imageName)}`;
       catRows.forEach(r => {
         r.style.display = r.style.display === "none" ? "" : "none";
       });
-      catRow.cells[0].textContent = catRow.cells[0].textContent.startsWith("▼")
-        ? catRow.cells[0].textContent.replace("▼", "▶")
-        : catRow.cells[0].textContent.replace("▶", "▼");
+      const arrow = catRow.querySelector(".cat-arrow");
+      arrow.textContent = arrow.textContent === "▼" ? "▶" : "▼";
     });
   });
 }
